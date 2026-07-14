@@ -6,12 +6,18 @@ function init() {
 
   let sa;
 
-  if (process.env.FIREBASE_SERVICE_ACCOUNT && process.env.FIREBASE_SERVICE_ACCOUNT.startsWith('{')) {
-    sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  } else {
+  try {
+    // Try to parse as JSON string (Railway environment variable)
+    const envVal = process.env.FIREBASE_SERVICE_ACCOUNT || '';
+    if (envVal.length > 10) {
+      sa = JSON.parse(envVal);
+    } else {
+      throw new Error('not json');
+    }
+  } catch (e) {
+    // Fall back to file (local development)
     const path = require('path');
-    const filePath = path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT || './firebase-service-account.json');
-    sa = require(filePath);
+    sa = require(path.resolve('./firebase-service-account.json'));
   }
 
   admin.initializeApp({ credential: admin.credential.cert(sa) });
