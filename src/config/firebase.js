@@ -1,10 +1,19 @@
 const admin = require('firebase-admin');
-const path  = require('path');
 let _db, _msg;
 
 function init() {
   if (admin.apps.length) return;
-  const sa = require(path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT || './firebase-service-account.json'));
+
+  let sa;
+
+  if (process.env.FIREBASE_SERVICE_ACCOUNT && process.env.FIREBASE_SERVICE_ACCOUNT.startsWith('{')) {
+    sa = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } else {
+    const path = require('path');
+    const filePath = path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT || './firebase-service-account.json');
+    sa = require(filePath);
+  }
+
   admin.initializeApp({ credential: admin.credential.cert(sa) });
   _db  = admin.firestore();
   _msg = admin.messaging();
