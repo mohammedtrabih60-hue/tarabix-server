@@ -1,0 +1,52 @@
+const router = require('express').Router();
+const auth   = require('../middleware/auth');
+const role   = require('../middleware/requireRole');
+const { db } = require('../config/firebase');
+const { v4: uuid } = require('uuid');
+
+router.get('/', auth, async (req, res) => {
+  try {
+    const snap = await db().collection('messages').where('schoolId', '==', req.schoolId).orderBy('sentAt', 'desc').limit(200).get();
+    res.json({ success: true, data: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
+  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
+});
+
+router.post('/', auth, role('director', 'teacher'), async (req, res) => {
+  try {
+    const { subject, content, recipientId, classId } = req.body;
+    if (!subject || !content) return res.status(400).json({ success: false, code: 'missing_fields' });
+    const id  = uuid();
+    const msg = { id, subject, content, sentAt: new Date().toISOString(), schoolId: req.schoolId, sentBy: req.userId, recipientId: recipientId || null, classId: recipientId ? (classId || null) : null, readBy: {} };
+    await db().collection('messages').doc(id).set(msg);
+    res.json({ success: true, data: msg });
+  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
+});
+
+router.delete('/:id', auth, async (req, res) => {
+  try { await db().collection('messages').doc(req.params.id).delete(); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
+});
+
+module.exports = router;
+// POST /api/messages/to-parent — send message to parent
+router.post('/to-parent', auth, role('director', 'teacher'), async (req, res) => {
+  try {
+    const { parentId, subject, content } = req.body;
+    if (!parentId || !subject || !content)
+      return res.status(400).json({ success: false, code: 'missing_fields' });
+
+    const id  = uuid();
+    const msg = {
+      id, subject, content,
+      sentAt: new Date().toISOString(),
+      schoolId: req.schoolId,
+      sentBy: req.userId,
+      recipientId: parentId,
+      classId: null,
+      readBy: {},
+      isToParent: true,
+    };
+    await db().collection('messages').doc(id).set(msg);
+    res.json({ success: true, data: msg });
+  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
+});

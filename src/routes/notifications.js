@@ -1,0 +1,43 @@
+const router = require('express').Router();
+const auth   = require('../middleware/auth');
+const { db } = require('../config/firebase');
+const { getTokens, sendPush } = require('../services/fcm');
+const { v4: uuid } = require('uuid');
+
+router.get('/', auth, async (req, res) => {
+  try {
+    const snap = await db().collection('notifications').where('schoolId', '==', req.schoolId).orderBy('sentAt', 'desc').limit(100).get();
+    res.json({ success: true, data: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
+  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
+});
+
+// POST /api/notifications/push — send push
+router.post('/push', auth, async (req, res) => {
+  try {
+    const { title, body, type, targetUserId, classId } = req.body;
+    if (!title) return res.status(400).json({ success: false, code: 'no_title' });
+    const tokens = await getTokens(req.schoolId, { targetUserId, classId });
+    const result = await sendPush(tokens, title, body || '', { type: type || 'general' });
+    // Save to Firestore
+    const id = uuid();
+    await db().collection('notifications').doc(id).set({ id, title, body: body||'', type:type||'general', schoolId: req.schoolId, classId: classId||null, targetUserId: targetUserId||null, sentBy: req.userId, sentAt: new Date().toISOString(), isRead: false });
+    res.json({ success: true, ...result });
+  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
+});
+
+// POST /api/notifications/note — teacher note to student
+router.post('/note', auth, async (req, res) => {
+  try {
+    const { studentId, studentName, noteText, isUrgent } = req.body;
+    if (!studentId || !noteText) return res.status(400).json({ success: false, code: 'missing_fields' });
+    const id  = uuid();
+    const now = new Date().toISOString();
+    await db().collection('teacher_notes').doc(id).set({ id, type: isUrgent?'urgent':'normal', title: isUrgent?'🚨 הערה דחופה מהמורה':'📝 הערה מהמורה', body: noteText, fromId: req.userId, toStudentId: studentId, toStudentName: studentName||'', schoolId: req.schoolId, createdAt: now, isRead: false });
+    // Push
+    const tokens = await getTokens(req.schoolId, { targetUserId: studentId });
+    if (tokens.length) await sendPush(tokens, isUrgent?'🚨 הערה דחופה':'📝 הערה מהמורה', noteText, { type: 'teacher_note' });
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
+});
+
+module.exports = router;
