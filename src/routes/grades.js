@@ -1,29 +1,5 @@
-const router = require('express').Router();
-const auth   = require('../middleware/auth');
-const { db } = require('../config/firebase');
-const { v4: uuid } = require('uuid');
-
-router.get('/', auth, async (req, res) => {
-  try {
-    let q = db().collection('grades').where('schoolId', '==', req.schoolId);
-    if (req.query.studentId) q = q.where('studentId', '==', req.query.studentId);
-    const snap = await q.orderBy('date', 'desc').limit(500).get();
-    res.json({ success: true, data: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
-  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
-});
-
-router.post('/', auth, async (req, res) => {
-  try {
-    const id = uuid();
-    const grade = { id, ...req.body, schoolId: req.schoolId, teacherId: req.userId, createdAt: new Date().toISOString() };
-    await db().collection('grades').doc(id).set(grade);
-    res.json({ success: true, data: grade });
-  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
-});
-
-router.delete('/:id', auth, async (req, res) => {
-  try { await db().collection('grades').doc(req.params.id).delete(); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
-});
-
-module.exports = router;
+const router=require('express').Router();const auth=require('../middleware/auth');const{db}=require('../config/firebase');const{v4:uuid}=require('uuid');
+router.get('/',auth,async(req,res)=>{try{let q=db().collection('grades').where('schoolId','==',req.schoolId);if(req.query.studentId)q=q.where('studentId','==',req.query.studentId);const snap=await q.orderBy('date','desc').limit(500).get();res.json({success:true,data:snap.docs.map(d=>({id:d.id,...d.data()}))});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
+router.post('/',auth,async(req,res)=>{try{const id=uuid();const grade={id,...req.body,schoolId:req.schoolId,teacherId:req.userId,createdAt:new Date().toISOString()};await db().collection('grades').doc(id).set(grade);res.json({success:true,data:grade});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
+router.delete('/:id',auth,async(req,res)=>{try{await db().collection('grades').doc(req.params.id).delete();res.json({success:true});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
+module.exports=router;

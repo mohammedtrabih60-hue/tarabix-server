@@ -1,41 +1,6 @@
-const router = require('express').Router();
-const auth   = require('../middleware/auth');
-const role   = require('../middleware/requireRole');
-const { db } = require('../config/firebase');
-const { v4: uuid } = require('uuid');
-
-// GET /api/teachers
-router.get('/', auth, async (req, res) => {
-  try {
-    const snap = await db().collection('teacher_accounts').where('schoolId', '==', req.schoolId).get();
-    res.json({ success: true, data: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
-  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
-});
-
-// POST /api/teachers
-router.post('/', auth, role('director', 'admin'), async (req, res) => {
-  try {
-    const { name, email, password, allowedClassIds } = req.body;
-    if (!name || !email || !password)
-      return res.status(400).json({ success: false, code: 'missing_fields' });
-    const lEmail = email.trim().toLowerCase();
-    const exists = await db().collection('teacher_accounts').where('email', '==', lEmail).limit(1).get();
-    if (!exists.empty) return res.status(400).json({ success: false, code: 'email_taken' });
-    const id = uuid();
-    const teacher = { id, name:name.trim(), email:lEmail, password:password.trim(), schoolId:req.schoolId, allowedClassIds:allowedClassIds||[], isActive:true, createdAt:new Date().toISOString() };
-    await db().collection('teacher_accounts').doc(id).set(teacher);
-    res.json({ success: true, data: teacher });
-  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
-});
-
-router.patch('/:id', auth, async (req, res) => {
-  try { await db().collection('teacher_accounts').doc(req.params.id).update(req.body); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
-});
-
-router.delete('/:id', auth, role('director', 'admin'), async (req, res) => {
-  try { await db().collection('teacher_accounts').doc(req.params.id).delete(); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
-});
-
-module.exports = router;
+const router=require('express').Router();const auth=require('../middleware/auth');const role=require('../middleware/requireRole');const{db}=require('../config/firebase');const{v4:uuid}=require('uuid');
+router.get('/',auth,async(req,res)=>{try{const snap=await db().collection('teacher_accounts').where('schoolId','==',req.schoolId).get();res.json({success:true,data:snap.docs.map(d=>({id:d.id,...d.data()}))});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
+router.post('/',auth,role('director','admin'),async(req,res)=>{try{const{name,email,password,allowedClassIds}=req.body;if(!name||!email||!password)return res.status(400).json({success:false,code:'missing_fields'});const lEmail=email.trim().toLowerCase();const exists=await db().collection('teacher_accounts').where('email','==',lEmail).limit(1).get();if(!exists.empty)return res.status(400).json({success:false,code:'email_taken'});const id=uuid();const t={id,name:name.trim(),email:lEmail,password:password.trim(),schoolId:req.schoolId,allowedClassIds:allowedClassIds||[],isActive:true,createdAt:new Date().toISOString()};await db().collection('teacher_accounts').doc(id).set(t);res.json({success:true,data:t});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
+router.patch('/:id',auth,async(req,res)=>{try{await db().collection('teacher_accounts').doc(req.params.id).update(req.body);res.json({success:true});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
+router.delete('/:id',auth,role('director','admin'),async(req,res)=>{try{await db().collection('teacher_accounts').doc(req.params.id).delete();res.json({success:true});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
+module.exports=router;

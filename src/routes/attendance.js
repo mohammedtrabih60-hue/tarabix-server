@@ -1,30 +1,4 @@
-const router = require('express').Router();
-const auth   = require('../middleware/auth');
-const { db } = require('../config/firebase');
-
-router.get('/', auth, async (req, res) => {
-  try {
-    let q = db().collection('attendance').where('schoolId', '==', req.schoolId);
-    if (req.query.studentId) q = q.where('studentId', '==', req.query.studentId);
-    if (req.query.classId)   q = q.where('classId',   '==', req.query.classId);
-    const snap = await q.orderBy('date', 'desc').limit(1000).get();
-    res.json({ success: true, data: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
-  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
-});
-
-router.post('/', auth, async (req, res) => {
-  try {
-    const { records } = req.body;
-    if (!records?.length) return res.status(400).json({ success: false, code: 'no_records' });
-    const batch = db().batch();
-    records.forEach(r => {
-      const day = (r.date || new Date().toISOString()).split('T')[0];
-      const id  = `${r.studentId}_${day}`;
-      batch.set(db().collection('attendance').doc(id), { id, ...r, schoolId: req.schoolId, date: r.date || new Date().toISOString() });
-    });
-    await batch.commit();
-    res.json({ success: true, saved: records.length });
-  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
-});
-
-module.exports = router;
+const router=require('express').Router();const auth=require('../middleware/auth');const{db}=require('../config/firebase');
+router.get('/',auth,async(req,res)=>{try{let q=db().collection('attendance').where('schoolId','==',req.schoolId);if(req.query.studentId)q=q.where('studentId','==',req.query.studentId);const snap=await q.orderBy('date','desc').limit(1000).get();res.json({success:true,data:snap.docs.map(d=>({id:d.id,...d.data()}))});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
+router.post('/',auth,async(req,res)=>{try{const{records}=req.body;if(!records?.length)return res.status(400).json({success:false,code:'no_records'});const batch=db().batch();records.forEach(r=>{const day=(r.date||new Date().toISOString()).split('T')[0];const id=`${r.studentId}_${day}`;batch.set(db().collection('attendance').doc(id),{id,...r,schoolId:req.schoolId,date:r.date||new Date().toISOString()});});await batch.commit();res.json({success:true,saved:records.length});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
+module.exports=router;

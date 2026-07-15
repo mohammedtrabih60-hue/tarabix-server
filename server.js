@@ -1,65 +1,67 @@
-// ══════════════════════════════════════════════════════════════════════════════
-//  Tarabix Academy — SaaS Backend Server
-//  Multi-School Platform
-//  تشغيل: node server.js
-// ══════════════════════════════════════════════════════════════════════════════
 require('dotenv').config();
-const express    = require('express');
-const cors       = require('cors');
-const helmet     = require('helmet');
-const rateLimit  = require('express-rate-limit');
-const path       = require('path');
-const { init }   = require('./src/config/firebase');
+const express   = require('express');
+const cors      = require('cors');
+const helmet    = require('helmet');
+const rateLimit = require('express-rate-limit');
+const path      = require('path');
+const { init }  = require('./src/config/firebase');
 
-// Initialize Firebase
 init();
 
 const app = express();
-
-// ── Security ──────────────────────────────────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: '*', methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'Accept'] }));
+app.use(cors({ origin: '*', methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'], allowedHeaders: ['Content-Type','Authorization','Accept'] }));
 app.options('*', cors());
 app.use(express.json({ limit: '20mb' }));
+app.use('/api/', rateLimit({ windowMs: 60_000, max: 300, message: { success: false, code: 'rate_limited' } }));
 
-// Rate limiting
-app.use('/api/', rateLimit({ windowMs: 60_000, max: 200,
-  message: { success: false, code: 'rate_limited' } }));
+// Serve Flutter web
+app.use(express.static(path.join(__dirname, 'web')));
 
-// Static uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// ── Routes ────────────────────────────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────────────────────
 app.use('/api/auth',          require('./src/routes/auth'));
+
+// ── School Management ─────────────────────────────────────────────────────────
 app.use('/api/schools',       require('./src/routes/schools'));
+app.use('/api/classes',       require('./src/routes/classes'));
+
+// ── Users ─────────────────────────────────────────────────────────────────────
 app.use('/api/students',      require('./src/routes/students'));
 app.use('/api/teachers',      require('./src/routes/teachers'));
-app.use('/api/classes',       require('./src/routes/classes'));
+app.use('/api/parents',       require('./src/routes/parents'));
+
+// ── Academic ──────────────────────────────────────────────────────────────────
 app.use('/api/grades',        require('./src/routes/grades'));
 app.use('/api/attendance',    require('./src/routes/attendance'));
+app.use('/api/assignments',   require('./src/routes/assignments'));
+app.use('/api/quizzes',       require('./src/routes/quizzes'));
+app.use('/api/courses',       require('./src/routes/courses'));
+app.use('/api/certificates',  require('./src/routes/certificates'));
+app.use('/api/schedule',      require('./src/routes/schedule'));
+
+// ── Communication ─────────────────────────────────────────────────────────────
 app.use('/api/messages',      require('./src/routes/messages'));
 app.use('/api/notifications', require('./src/routes/notifications'));
-app.use('/api/parents',       require('./src/routes/parents'));
+app.use('/api/faniyot',       require('./src/routes/faniyot'));
+
+// ── Finance ───────────────────────────────────────────────────────────────────
+app.use('/api/payments',      require('./src/routes/payments'));
+app.use('/api/points',        require('./src/routes/points'));
+
+// ── AI ────────────────────────────────────────────────────────────────────────
 app.use('/api/ai',            require('./src/routes/ai'));
-app.use('/api/schedule',       require('./src/routes/schedule'));
 
-// ── Health ────────────────────────────────────────────────────────────────
-app.get('/health', (_, res) => res.json({
-  status: 'ok',
-  server: 'Tarabix Academy SaaS v2.0',
-  time:   new Date().toISOString(),
-}));
+// ── Health ────────────────────────────────────────────────────────────────────
+app.get('/health', (_, res) => res.json({ status: 'ok', server: 'Tarabix Academy SaaS v2.0', time: new Date().toISOString() }));
 
-// ── 404 ───────────────────────────────────────────────────────────────────
-app.use((req, res) => res.status(404).json({ success: false, code: 'not_found', path: req.path }));
+// Flutter SPA fallback
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api') && !req.path.startsWith('/health'))
+    res.sendFile(path.join(__dirname, 'web', 'index.html'));
+});
 
-// ── Start ─────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log('\n══════════════════════════════════════════');
-  console.log('  🚀 Tarabix Academy SaaS Server');
-  console.log('══════════════════════════════════════════');
-  console.log(`  📡 http://localhost:${PORT}/health`);
-  console.log(`  🔐 POST http://localhost:${PORT}/api/auth/login`);
-  console.log('══════════════════════════════════════════\n');
+  console.log(`\n🚀 Tarabix Academy Server — Port ${PORT}`);
+  console.log(`📡 http://localhost:${PORT}/health\n`);
 });
