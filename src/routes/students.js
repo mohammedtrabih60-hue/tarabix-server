@@ -8,3 +8,22 @@ router.post('/:id/reject',auth,async(req,res)=>{try{await db().collection('stude
 router.post('/:id/reset-password',auth,async(req,res)=>{try{if(!req.body.password)return res.status(400).json({success:false,code:'missing_password'});await db().collection('students').doc(req.params.id).update({password:req.body.password.trim()});res.json({success:true});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
 router.post('/update-profile',auth,async(req,res)=>{try{const{name,phone,profileImageBase64}=req.body;const u={};if(name)u.name=name;if(phone!==undefined)u.phone=phone;if(profileImageBase64)u.profileImageBase64=profileImageBase64;let col,docId;if(req.role==='student'){col='students';docId=req.userId;}else if(req.role==='director'){col='schools';docId=req.schoolId;if(name)u.teacherName=name;if(profileImageBase64)u.teacherPhotoBase64=profileImageBase64;}else{col='teacher_accounts';docId=req.userId.replace('teacher-','');}await db().collection(col).doc(docId).update(u);res.json({success:true});}catch(e){res.status(500).json({success:false,code:'server_error'});}});
 module.exports=router;
+// GET /api/access-codes
+router.get('/access-codes', require('../middleware/auth'), async(req,res)=>{
+  try {
+    const snap = await db().collection('access_codes').where('schoolId','==',req.schoolId).get();
+    res.json({success:true, data: snap.docs.map(d=>({id:d.id,...d.data()}))});
+  } catch(e) { res.status(500).json({success:false,code:'server_error'}); }
+});
+
+// POST /api/access-codes
+router.post('/access-codes', require('../middleware/auth'), async(req,res)=>{
+  try {
+    const {v4:uuid} = require('uuid');
+    const id = uuid();
+    const code = Math.random().toString(36).substring(2,8).toUpperCase();
+    const ac = {id, code, ...req.body, schoolId:req.schoolId, createdBy:req.userId, createdAt:new Date().toISOString(), isUsed:false};
+    await db().collection('access_codes').doc(id).set(ac);
+    res.json({success:true, data:ac});
+  } catch(e) { res.status(500).json({success:false,code:'server_error'}); }
+});

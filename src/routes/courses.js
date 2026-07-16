@@ -50,3 +50,34 @@ router.delete('/:id/lessons/:lessonId', auth, async (req, res) => {
 });
 
 module.exports = router;
+
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+const storage = multer.diskStorage({
+  destination: (_, __, cb) => {
+    const dir = path.join(process.cwd(), 'uploads', 'lessons');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (_, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+});
+const upload = multer({ storage, limits: { fileSize: 200 * 1024 * 1024 } }); // 200MB
+
+// POST /api/courses/:id/lessons/upload — upload lesson file
+router.post('/:id/lessons/upload', require('../middleware/auth'), upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, code: 'no_file' });
+    const {v4:uuid} = require('uuid');
+    const lessonId = req.body.lessonId || uuid();
+    const fileUrl = `/uploads/lessons/${req.file.filename}`;
+    // Update lesson in Firestore with file URL
+    await db().collection('lessons').doc(lessonId).set({
+      id: lessonId, courseId: req.params.id, fileUrl, mimeType: req.file.mimetype,
+      originalName: req.file.originalname, fileSize: req.file.size,
+      schoolId: req.schoolId, uploadedBy: req.userId, uploadedAt: new Date().toISOString(),
+    }, { merge: true });
+    res.json({ success: true, fileUrl, lessonId });
+  } catch (e) { res.status(500).json({ success: false, code: 'server_error' }); }
+});
